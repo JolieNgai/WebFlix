@@ -1,21 +1,15 @@
-<!-- navbar.html -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<div class="announcement">A good movie starts a great conversation. <a href="index.html#catalog">Find your next watch &rarr;</a></div>
+<nav class="navbar navbar-expand-lg navbar-light site-nav" aria-label="Main navigation">
   <div class="container">
-    <a class="navbar-brand" href="index.html">WebFlix</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-      <span class="navbar-toggler-icon"></span>
-    </button>
+    <a class="navbar-brand" href="index.html"><span class="brand-mark" aria-hidden="true">&#10035;</span> WEBFLIX<span class="brand-period">.</span></a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button>
     <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto">
-        <li class="nav-item"><a class="nav-link" href="index.html">Catalog</a></li>
-        <!-- Shown when NOT logged in -->
+      <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-4">
+        <li class="nav-item"><a class="nav-link" href="index.html">Discover movies</a></li>
         <li class="nav-item auth-guest"><a class="nav-link" href="login.html">Log in</a></li>
-        <li class="nav-item auth-guest"><a class="nav-link" href="register.html">Register</a></li>
-        <!-- Shown when LOGGED IN -->
-        <li class="nav-item auth-user"><a class="nav-link" href="profile.html">Profile/Watchlist</a></li>
-        <li class="nav-item auth-user">
-          <a class="nav-link" href="#" id="logoutBtn">Logout</a>
-        </li>
+        <li class="nav-item auth-guest"><a class="nav-link nav-cta" href="register.html">Join the club <span aria-hidden="true">&nearr;</span></a></li>
+        <li class="nav-item auth-user"><a class="nav-link" href="profile.html">My watchlist</a></li>
+        <li class="nav-item auth-user"><a class="nav-link" href="#" id="logoutBtn">Log out &nearr;</a></li>
       </ul>
     </div>
   </div>

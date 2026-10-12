@@ -1,6 +1,6 @@
 const API_BASE = "https://inf2003-backend-161924392.asia-southeast1.run.app";
-const PLACEHOLDER_CARD = "https://via.placeholder.com/300x450?text=No+Poster";
-const PLACEHOLDER_DETAIL = "https://via.placeholder.com/500x750?text=No+Poster";
+const PLACEHOLDER_CARD = "assets/poster-placeholder.svg";
+const PLACEHOLDER_DETAIL = "assets/poster-placeholder.svg";
 
 // tiny escape to avoid XSS when inserting strings into HTML
 const esc = (s) =>
@@ -50,7 +50,7 @@ function renderCard(m) {
   return `
   <div class="col-12 col-sm-6 col-md-4 col-lg-3 mb-4">
     <div class="card h-100 shadow-sm">
-      <img src="${img}" class="card-img-top" alt="${esc(m.title)}">
+      <img src="${esc(safeImage(img, PLACEHOLDER_CARD))}" loading="lazy" onerror="this.src='assets/poster-placeholder.svg'" class="card-img-top" alt="${esc(m.title)}">
       <div class="card-body d-flex flex-column">
       <button class="btn btn-outline-danger btn-sm mb-2 bookmark-btn"
               data-id="${esc(m._id)}"
@@ -144,6 +144,14 @@ async function loadMovies(page = 1, q = null) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const docs = data.documents || [];
+    if (!q && page === 1) {
+      const featured = docs.find(m => m.poster_url);
+      const cover = document.getElementById("catalog-cover");
+      if (featured && cover) {
+        cover.src = safeImage(featured.poster_url);
+        cover.hidden = false;
+      }
+    }
 
     list.innerHTML =
       docs.map(renderCard).join("") ||
@@ -191,142 +199,77 @@ function hookSearch() {
 
 // ---------- DETAILS (movie.html) ----------
 
+function safeImage(value, fallback = PLACEHOLDER_DETAIL) {
+  try {
+    const url = new URL(value, location.origin);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : fallback;
+  } catch { return fallback; }
+}
+
 function renderDetails(m) {
-  const img = m.poster_url || PLACEHOLDER_DETAIL;
-  const year = m.year ? `(${m.year})` : "";
-  const genres = formatList(m.genres) || "—";
-  const languages = formatList(m.spoken_languages) || "—";
-  const companies = formatList(m.production_companies) || "—";
-  const countries = formatList(m.production_countries) || "—";
-  const runtime = formatRuntime(m.runtime);
-
-  const ratingValue = Number(m.vote_average);
-  const ratingText =
-    Number.isFinite(ratingValue) && ratingValue > 0
-      ? `${ratingValue.toFixed(1)} / 10${
-          m.vote_count ? ` (${m.vote_count} votes)` : ""
-        }`
-      : "Not rated yet";
-
-  const budget = formatCurrency(m.budget);
-  const revenue = formatCurrency(m.revenue);
-  const profit =
-    m.budget && m.revenue
-      ? formatCurrency(Number(m.revenue) - Number(m.budget))
-      : "";
-  const release = m.release_date || "—";
-  const popularity =
-    m.popularity != null ? String(m.popularity) : "—";
-  const language = m.original_language || "—";
-  const collectionName = m.collection && m.collection.name;
-  const homepage = m.homepage;
-  const imdb = m.imdb_id
-    ? `https://www.imdb.com/title/${encodeURIComponent(m.imdb_id)}`
-    : null;
-
-  const taglineHtml = m.tagline
-    ? `<p class="text-muted fst-italic mb-2">${esc(m.tagline)}</p>`
+  const poster = safeImage(m.poster_url);
+  const backdrop = safeImage(m.backdrop_url || m.poster_url);
+  const rating = Number(m.vote_average);
+  const stars = Number.isFinite(rating) && rating > 0
+    ? "&#9733;".repeat(Math.max(1, Math.min(5, Math.round(rating / 2))))
     : "";
-  const overviewHtml = m.overview
-    ? `<p class="mb-3">${esc(m.overview)}</p>`
-    : "";
-
-  let linksHtml = "";
-  if (homepage || imdb) {
-    const parts = [];
-    if (homepage) {
-      parts.push(
-        `<a href="${homepage}" target="_blank" rel="noopener">Official site</a>`
-      );
+  const facts = [
+    ["Running time", formatRuntime(m.runtime)],
+    ["Budget", formatCurrency(m.budget)],
+    ["Release date", m.release_date || "Not available"],
+    ["Rating", rating > 0 ? rating.toFixed(1) + " / 10" : "Not rated"]
+  ];
+  let official = "";
+  try {
+    const url = new URL(m.homepage);
+    if (["http:", "https:"].includes(url.protocol)) {
+      official = '<a href="' + esc(url.href) + '" target="_blank" rel="noopener noreferrer">Official website &#8599;</a>';
     }
-    if (imdb) {
-      parts.push(
-        `<a href="${imdb}" target="_blank" rel="noopener">IMDb</a>`
-      );
-    }
-    linksHtml = parts.join(" • ");
-  }
-
+  } catch {}
+  const imdb = m.imdb_id ? '<a href="https://www.imdb.com/title/' + encodeURIComponent(m.imdb_id) + '" target="_blank" rel="noopener noreferrer">IMDb &#8599;</a>' : "";
   return `
-    <div class="card shadow-sm">
-      <div class="row g-0">
-        <div class="col-md-4">
-          <img src="${img}" class="img-fluid rounded-start w-100" alt="${esc(
-            m.title
-          )}">
-        </div>
-        <div class="col-md-8">
-          <div class="card-body">
-            <h2 class="card-title" id="movie-title">${esc(m.title)} ${year}</h2>
-            ${taglineHtml}
-            ${overviewHtml}
-
-            <dl class="row mb-0">
-              <dt class="col-sm-4">Release date</dt><dd class="col-sm-8">${esc(
-                release
-              )}</dd>
-              <dt class="col-sm-4">Runtime</dt><dd class="col-sm-8">${esc(
-                runtime
-              )}</dd>
-              <dt class="col-sm-4">Genres</dt><dd class="col-sm-8">${esc(
-                genres
-              )}</dd>
-              <dt class="col-sm-4">Spoken languages</dt><dd class="col-sm-8">${esc(
-                languages
-              )}</dd>
-              <dt class="col-sm-4">Production companies</dt><dd class="col-sm-8">${esc(
-                companies
-              )}</dd>
-              <dt class="col-sm-4">Production countries</dt><dd class="col-sm-8">${esc(
-                countries
-              )}</dd>
-              <dt class="col-sm-4">Status</dt><dd class="col-sm-8">${esc(
-                m.status || "—"
-              )}</dd>
-              <dt class="col-sm-4">Original language</dt><dd class="col-sm-8">${esc(
-                language
-              )}</dd>
-              <dt class="col-sm-4">Popularity</dt><dd class="col-sm-8">${esc(
-                popularity
-              )}</dd>
-              <dt class="col-sm-4">Rating</dt><dd class="col-sm-8">${esc(
-                ratingText
-              )}</dd>
-              <dt class="col-sm-4">Budget</dt><dd class="col-sm-8">${esc(
-                budget
-              )}</dd>
-              <dt class="col-sm-4">Revenue</dt><dd class="col-sm-8">${esc(
-                revenue
-              )}</dd>
-              ${
-                profit
-                  ? `<dt class="col-sm-4">Approx. profit</dt><dd class="col-sm-8">${esc(
-                      profit
-                    )}</dd>`
-                  : ""
-              }
-              ${
-                collectionName
-                  ? `<dt class="col-sm-4">Collection</dt><dd class="col-sm-8">${esc(
-                      collectionName
-                    )}</dd>`
-                  : ""
-              }
-              ${
-                linksHtml
-                  ? `<dt class="col-sm-4">Links</dt><dd class="col-sm-8">${linksHtml}</dd>`
-                  : ""
-              }
-            </dl>
-
-            <a href="index.html" class="btn btn-outline-secondary mt-3">
-              &larr; Back to catalog
-            </a>
-          </div>
-        </div>
+    <div class="movie-cover"><img src="${esc(backdrop)}" alt="" onerror="this.src='assets/poster-placeholder.svg'"><div class="cover-shade"></div><div class="cover-caption"><span>WEBFLIX / MOVIE PROFILE</span><p>Every frame tells a story.</p></div></div>
+    <article class="movie-profile">
+      <header class="movie-heading">
+        <div><h1 id="movie-title">${esc(m.title)} <small>${m.year ? "(" + esc(m.year) + ")" : ""}</small></h1><p class="movie-genres">${esc(formatList(m.genres) || "Genres unavailable")}</p><span class="movie-stars" aria-label="${rating > 0 ? esc(rating.toFixed(1)) + ' out of 10' : 'Not rated'}">${stars}</span></div>
+        <div class="movie-links">${official}${imdb}<a href="index.html#catalog">Back to collection &#8592;</a></div>
+      </header>
+      <dl class="movie-metrics">${facts.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join("")}</dl>
+      <nav class="movie-section-nav" aria-label="Movie sections"><a href="#plot"><span aria-hidden="true">&#9636;</span>Plot</a><a href="#film-facts"><span aria-hidden="true">&#9432;</span>Film facts</a><a href="#reviews"><span aria-hidden="true">&#9733;</span>Reviews</a><a href="#related-section"><span aria-hidden="true">&#9654;</span>More movies</a></nav>
+      <div class="movie-editorial">
+        <img class="detail-poster" src="${esc(poster)}" alt="${esc(m.title)} poster" onerror="this.src='assets/poster-placeholder.svg'">
+        <section id="plot"><span class="section-kicker">THE STORY</span><h2>Plot</h2><p>${esc(m.overview || "A synopsis is not available for this movie.")}</p><a class="btn btn-dark" href="#reviews">Read the reviews &#8594;</a></section>
+        <section id="film-facts"><span class="section-kicker">BEHIND THE FILM</span><h2>Film facts</h2><dl class="film-facts">${[
+          ["Production", formatList(m.production_companies)],
+          ["Countries", formatList(m.production_countries)],
+          ["Languages", formatList(m.spoken_languages)],
+          ["Status", m.status],
+          ["Revenue", formatCurrency(m.revenue)],
+          ...(m.collection?.name ? [["Collection", m.collection.name]] : [])
+        ].map(([label,value]) => `<dt>${label}</dt><dd>${esc(value || "Not available")}</dd>`).join("")}</dl></section>
       </div>
-    </div>
+    </article>
+    ${m.tagline ? `<aside class="movie-tagline"><p>&ldquo;${esc(m.tagline)}&rdquo;</p><span>${esc(m.title)}</span></aside>` : ""}
   `;
+}
+
+async function loadRelatedMovies(movie) {
+  const target = document.getElementById("related-movies");
+  const heading = document.getElementById("related-heading");
+  if (!target) return;
+  try {
+    const response = await fetch(API_BASE + "/api/movies?limit=36&minRating=0");
+    if (!response.ok) throw new Error("Could not load more movies");
+    const data = await response.json();
+    const candidates = (data.documents || []).filter(m => m.title !== movie.title);
+    const genres = new Set(movie.genres || []);
+    const matching = candidates.filter(m => (m.genres || []).some(g => genres.has(g)));
+    const related = matching.length ? matching.slice(0,6) : candidates.slice(0,6);
+    heading.textContent = matching.length ? "Related movies" : "More to discover";
+    target.innerHTML = related.map(m => `<a class="related-card" href="movie.html?t=${encodeURIComponent(m.title)}"><img src="${esc(safeImage(m.poster_url, PLACEHOLDER_CARD))}" alt="${esc(m.title)} poster" loading="lazy" onerror="this.src='assets/poster-placeholder.svg'"><span class="related-rating">${Number(m.vote_average) > 0 ? "&#9733; " + Number(m.vote_average).toFixed(1) + " / 10" : "Not rated"}</span><h3>${esc(m.title)}</h3><p>${esc(m.year || "")}</p></a>`).join("") || '<p>No other movies are available yet.</p>';
+  } catch {
+    target.innerHTML = '<p>More movies are unavailable right now. <a href="index.html">Browse the collection</a></p>';
+  }
 }
 
 async function loadDetails() {
@@ -351,6 +294,8 @@ async function loadDetails() {
     }
     const movie = await res.json();
     target.innerHTML = renderDetails(movie);
+    document.title = movie.title + " | WebFlix";
+    loadRelatedMovies(movie);
   } catch (e) {
     console.error(e);
     target.innerHTML = `<p class="text-danger">Could not load details.</p>`;

@@ -4,12 +4,27 @@ document.addEventListener("DOMContentLoaded", () => {
   const registerForm = document.getElementById("registerForm");
   const loginForm = document.getElementById("loginForm");
 
+  const loginPassword = document.getElementById("loginPassword");
+  const loginToggle = document.getElementById("toggleLoginPassword");
+  if (loginPassword && loginToggle) {
+    loginToggle.addEventListener("click", () => {
+      const reveal = loginPassword.type === "password";
+      loginPassword.type = reveal ? "text" : "password";
+      loginToggle.textContent = reveal ? "Hide" : "Show";
+      loginToggle.setAttribute("aria-label", reveal ? "Hide password" : "Show password");
+      loginToggle.setAttribute("aria-pressed", String(reveal));
+    });
+  }
+
   // ===== Password show/hide (used on both pages) =====
   const passwordInput = document.getElementById("registerPassword");
   const togglePasswordBtn = document.getElementById("toggleRegisterPassword");
 
   if (togglePasswordBtn && passwordInput) {
     togglePasswordBtn.addEventListener("click", () => {
+      const reveal = passwordInput.type === "password";
+      togglePasswordBtn.setAttribute("aria-label", reveal ? "Hide password" : "Show password");
+      togglePasswordBtn.setAttribute("aria-pressed", String(reveal));
       if (passwordInput.type === "password") {
         passwordInput.type = "text";
         togglePasswordBtn.textContent = "Hide";

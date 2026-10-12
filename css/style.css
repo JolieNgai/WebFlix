@@ -1,0 +1,22 @@
+body {
+    background-color: #f8f9fa;
+}
+
+.card-title {
+    font-size: 1rem;
+    font-weight: bold;
+}
+
+.card img {
+    height: 300px;
+    object-fit: cover;
+}
+
+.container {
+    max-width: 1200px;
+}
+
+.login-container {
+    max-width: 500px;
+    margin: auto;
+}

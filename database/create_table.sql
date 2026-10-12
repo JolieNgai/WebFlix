@@ -1,0 +1,23 @@
+
+CREATE TABLE IF NOT EXISTS users (
+  u_id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  u_name VARCHAR(100),
+  u_email VARCHAR(100) UNIQUE NOT NULL,
+  u_password_hash TEXT NOT NULL,
+  u_role VARCHAR(20) DEFAULT 'user'
+);
+
+CREATE TABLE IF NOT EXISTS reviews (
+  r_id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  movie_title VARCHAR(255) NOT NULL,
+  rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS watchlist (
+  w_id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL REFERENCES users(u_id) ON DELETE CASCADE,
+  movie_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(), CONSTRAINT uq_user_movie UNIQUE (user_id, movie_id)
+);

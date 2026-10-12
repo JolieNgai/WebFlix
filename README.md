@@ -10,7 +10,7 @@ WebFlix is an INF2003 movie catalog and review web application built with HTML, 
 - Read and submit reviews with ratings from 1 to 5.
 - View a profile and add or remove movies from a personal watchlist.
 
-**Known limitation:** the watchlist API returns movie IDs, while the profile UI expects movie details. Saved movie cards may not display correctly until those formats are aligned.
+Watchlists are linked to your account. Saved movie details appear on your profile, and save buttons reflect your persisted watchlist after refreshing. Entries whose movies were removed can still be deleted from your watchlist.
 
 ## Tech stack
 
@@ -34,8 +34,8 @@ It does not depend on the existing cloud databases or migrate their data.
 docker compose up --build -d
 ```
 
-3. Open **http://localhost:5500**.
-4. Check **http://localhost:5500/health**; expect `{"ok":1,"mongo":1,"postgres":1}`.
+3. Open **http://127.0.0.1:5500**.
+4. Check **http://127.0.0.1:5500/health**; expect `{"ok":1,"mongo":1,"postgres":1}`.
 
 No local Node.js, Python, PostgreSQL, or MongoDB installation is needed.
 The first build downloads images and dependencies and may take several minutes.
@@ -95,14 +95,15 @@ the containers to a host and configure production credentials, TLS, and database
 
 - **Cannot connect to the Docker engine:** start Docker Desktop and wait until the Linux engine is ready.
 - **Port 5500 is already allocated:** stop Live Server or change the host port in `compose.yaml`.
+- **`localhost:5500` loads a page but movies fail:** a separate IPv6 server may be using that address. Open `http://127.0.0.1:5500` to reach Docker directly. Local API configuration also uses this explicit IPv4 address.
 - **Setup or backend is unhealthy:** inspect `docker compose logs setup backend mongo postgres`.
 - **Old code is showing:** rebuild with `docker compose up --build -d` and refresh the browser.
 - **Movie fixtures are missing:** the seed intentionally skips nonempty collections; inspect the `setup` logs.
-- **Using Live Server instead of Docker:** it uses `js/config.js`, which points to the cloud API by default.
+- **Using Live Server instead of Docker:** local pages use `js/config.js`, which connects to the Docker API at port 5500. Keep Docker running.
 
 ## Run the frontend
 
-The frontend is configured to call this Google Cloud Run API address:
+Local pages connect to Docker at port 5500 by default. For the cloud API, set `window.WEBFLIX_API_BASE` in `js/config.js` to this address:
 
 ```text
 https://inf2003-backend-161924392.asia-southeast1.run.app
@@ -118,7 +119,7 @@ python -m http.server 5500
 
 Open **http://localhost:5500**. On Windows, use `py -m http.server 5500` if `python` is unavailable.
 
-An HTTP server is needed because the frontend fetches shared navbar and footer files. Backend dependencies are not required for this option. The configured cloud API must be available for data and login to work; Bootstrap and movie images also require internet access.
+An HTTP server is needed because the frontend fetches shared navbar and footer files. Backend dependencies are not required for this option. Docker must be running for the default local API, or the configured cloud API must be available for data and login to work; Bootstrap and movie images also require internet access.
 
 ## Run the backend locally
 
@@ -236,7 +237,7 @@ Paths are relative to the API base URL.
 | POST | `/api/register` | Register with `name`, `email`, and `password`. |
 | POST | `/api/login` | Log in with `email` and `password`. |
 | GET | `/api/user/me` | Get the authenticated user's profile. |
-| GET | `/api/watchlist` | Get the authenticated user's saved movie IDs. |
+| GET | `/api/watchlist` | Get the authenticated user's saved movie details and IDs. |
 | POST | `/api/watchlist/add` | Save a movie using `movie_id`. |
 | DELETE | `/api/watchlist/remove` | Remove a movie using `movie_id`. |
 
@@ -295,3 +296,21 @@ Keep changes focused, describe how to run and verify them, and update this READM
 
 `package.json` declares ISC. No standalone license file is currently included.
 
+
+## Watchlist verification
+
+Run the frontend state and profile rendering tests with Node.js:
+
+```sh
+node --test tests/watchlist-ui.test.mjs
+```
+
+With Docker running, test the API against both databases:
+
+```sh
+docker compose exec -T backend node --test backend/tests/watchlist.test.js
+```
+
+The integration test creates temporary accounts and one movie, then removes them.
+It checks saved movie details, duplicate saves, account isolation, malformed IDs,
+and removal of references to deleted movies.

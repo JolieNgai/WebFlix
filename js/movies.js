@@ -153,11 +153,13 @@ async function loadMovies(page = 1, q = null) {
       }
     }
 
+    await loadSavedMovieIds();
     list.innerHTML =
       docs.map(renderCard).join("") ||
       `<p class="text-muted">No results.</p>`;
 
       document.querySelectorAll(".bookmark-btn").forEach(btn => {
+      updateWatchlistButton(btn, btn.dataset.id);
       btn.addEventListener("click", () => {
         const movieId = btn.dataset.id;
         const title = btn.dataset.title;
@@ -382,43 +384,61 @@ function hookReviewForm() {
   });
 }
 
-async function addToWatchlist(movieId, title, btn) {
+const savedMovieIds = new Set();
+let watchlistReady = false;
+
+function updateWatchlistButton(button, movieId) {
+  const saved = savedMovieIds.has(movieId);
+  button.classList.toggle("active", saved);
+  button.setAttribute("aria-pressed", String(saved));
+  button.textContent = saved ? "Saved to watchlist" : "Save to watchlist";
+  button.disabled = !!localStorage.getItem("token") && !watchlistReady;
+  button.title = button.disabled ? "Refresh to retry loading your watchlist." : "";
+}
+
+async function loadSavedMovieIds() {
+  savedMovieIds.clear();
+  watchlistReady = false;
+  const status = document.getElementById("watchlist-status");
+  if (status) status.textContent = "";
   const token = localStorage.getItem("token");
-
-  if (!token) {
-    alert("Please log in to bookmark movies.");
-    return;
-  }
-
-  // Toggle UI
-  const active = btn.classList.toggle("active");
-
-  if (active) {
-    btn.style.backgroundColor = "#ffccd5";
-    btn.style.borderColor = "#ff99aa";
-    btn.textContent = "💖 Bookmarked";
-
-    // Call backend
-    await fetch(`${API_BASE}/api/watchlist/add`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ movie_id: movieId })
-    });
-
-  } else {
-    btn.style.backgroundColor = "";
-    btn.style.borderColor = "";
-    btn.textContent = "❤️ Bookmark";
-
-    await fetch(`${API_BASE}/api/watchlist/remove`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ movie_id: movieId })
-    });
+  if (!token) { watchlistReady = true; return; }
+  try {
+    const response = await fetch(`${API_BASE}/api/watchlist`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) throw new Error(response.status === 401 ? "Your session expired. Log in again to save movies." : "Saved movies could not be loaded. Refresh to retry.");
+    const movies = await response.json();
+    movies.forEach(movie => savedMovieIds.add(movie.movie_id));
+    watchlistReady = true;
+  } catch (error) {
+    if (status) status.textContent = error.message === "Failed to fetch" ? "Saved movies could not be loaded. Refresh to retry." : error.message;
   }
 }
 
-
+async function addToWatchlist(movieId, title, button) {
+  const token = localStorage.getItem("token");
+  if (!token) { alert("Please log in to save movies."); return; }
+  if (button.disabled || !watchlistReady) return;
+  const saved = savedMovieIds.has(movieId);
+  button.disabled = true;
+  button.textContent = saved ? "Removing..." : "Saving...";
+  try {
+    const response = await fetch(`${API_BASE}/api/watchlist/${saved ? "remove" : "add"}`, {
+      method: saved ? "DELETE" : "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ movie_id: movieId })
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(response.status === 401 ? "Your session expired. Log in again." : error.message || "Could not update your watchlist.");
+    }
+    if (saved) savedMovieIds.delete(movieId);
+    else savedMovieIds.add(movieId);
+  } catch (error) {
+    alert(error.message);
+  } finally {
+    updateWatchlistButton(button, movieId);
+  }
+}
 
 // ---------- INIT ----------
 

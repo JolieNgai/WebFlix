@@ -1,87 +1,68 @@
 import express from "express";
 import { ObjectId } from "mongodb";
 
-const router = express.Router();
-console.log("HELLO IM HERE");
-
 export default function watchlistRoutes(pgQuery, Movies, normalizeMovie) {
-  // ADD to watchlist --------------------------------------------------------
+  const router = express.Router();
+  const validId = value => typeof value === "string" && /^[a-f0-9]{24}$/i.test(value);
+
   router.post("/add", async (req, res) => {
+    const movieId = req.body?.movie_id;
+    if (!validId(movieId)) return res.status(400).json({ message: "A valid movie_id is required." });
     try {
-      const userId = req.user.id;           // from verifyToken
-      const { movie_id } = req.body;
-
-      if (!movie_id) {
-        return res
-          .status(400)
-          .json({ message: "movie_id is required" });
-      }
-
+      const movie = await Movies.findOne({ _id: new ObjectId(movieId) }, { projection: { _id: 1 } });
+      if (!movie) return res.status(404).json({ message: "This movie is no longer available." });
       await pgQuery(
-        `INSERT INTO watchlist (user_id, movie_id)
-         VALUES ($1, $2)
-         ON CONFLICT (user_id, movie_id) DO NOTHING`,
-        [userId, movie_id]
+        "INSERT INTO watchlist (user_id, movie_id) VALUES ($1, $2) ON CONFLICT (user_id, movie_id) DO NOTHING",
+        [req.user.id, movie._id.toString()]
       );
-
       res.status(201).json({ message: "Added to watchlist" });
-    } catch (err) {
-      console.error("❌ add watchlist error:", err);
-      res.status(500).json({ message: "Server error adding to watchlist" });
+    } catch (error) {
+      console.error("Add watchlist error:", error);
+      res.status(500).json({ message: "Could not save this movie." });
     }
   });
 
-  // REMOVE from watchlist ---------------------------------------------------
   router.delete("/remove", async (req, res) => {
+    const movieId = req.body?.movie_id;
+    // Allow removal of old references even when their movie has been deleted.
+    if (typeof movieId !== "string" || !movieId.trim() || movieId.length > 128) {
+      return res.status(400).json({ message: "movie_id is required." });
+    }
     try {
-      const userId = req.user.id;
-      const { movie_id } = req.body;
-
-      if (!movie_id) {
-        return res
-          .status(400)
-          .json({ message: "movie_id is required" });
-      }
-
-      await pgQuery(
-        `DELETE FROM watchlist
-         WHERE user_id = $1 AND movie_id = $2`,
-        [userId, movie_id]
-      );
-
+      await pgQuery("DELETE FROM watchlist WHERE user_id = $1 AND movie_id = $2", [req.user.id, movieId]);
       res.json({ message: "Removed from watchlist" });
-    } catch (err) {
-      console.error("❌ remove watchlist error:", err);
-      res.status(500).json({ message: "Server error removing from watchlist" });
+    } catch (error) {
+      console.error("Remove watchlist error:", error);
+      res.status(500).json({ message: "Could not remove this movie." });
     }
   });
 
-  // GET watchlist for logged-in user ---------------------------------------
   router.get("/", async (req, res) => {
-  const userId = req.user.id;   // user_id from JWT
-
-  try {
-    // 1. Fetch all watchlist rows for this user
-    const result = await pgQuery( `SELECT movie_id FROM watchlist WHERE user_id = $1`, [userId]);
-
-    // 2. If no rows, return empty array
-    if (result.rowCount === 0) {
-      return res.json([]);
+    try {
+      const result = await pgQuery(
+        "SELECT movie_id, created_at FROM watchlist WHERE user_id = $1 ORDER BY created_at DESC, w_id DESC",
+        [req.user.id]
+      );
+      if (!result.rows.length) return res.json([]);
+      const ids = result.rows.filter(row => validId(row.movie_id)).map(row => new ObjectId(row.movie_id));
+      const documents = ids.length ? await Movies.find({ _id: { $in: ids } }).toArray() : [];
+      const byId = new Map(documents.map(movie => [movie._id.toString(), movie]));
+      res.json(result.rows.map(row => {
+        const movie = byId.get(row.movie_id);
+        return {
+          ...(movie ? normalizeMovie(movie) : {
+            title: "Movie no longer available", poster_url: null, year: null, genres: [], overview: ""
+          }),
+          _id: row.movie_id,
+          movie_id: row.movie_id,
+          saved_at: row.created_at,
+          unavailable: !movie
+        };
+      }));
+    } catch (error) {
+      console.error("Load watchlist error:", error);
+      res.status(500).json({ message: "Could not load your watchlist." });
     }
-
-    // 3. Extract the rows cleanly
-    const movies = result.rows.map(row => ({
-      movie_id: row.movie_id,
-    }));
-
-    // 4. Return the list
-    return res.json(movies);
-
-  } catch (err) {
-    console.error("Error loading watchlist:", err);
-    return res.status(500).json({ error: "Failed to load watchlist" });
-  }
-});
-
+  });
   return router;
 }

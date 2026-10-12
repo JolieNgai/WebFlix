@@ -9,11 +9,20 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS reviews (
   r_id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id INT REFERENCES users(u_id) ON DELETE SET NULL,
   movie_title VARCHAR(255) NOT NULL,
   rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
   comment TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
 );
+
+-- Upgrade existing databases while preserving unowned historical reviews.
+-- New reviews always receive an owner from the authenticated API request.
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS user_id INT
+  REFERENCES users(u_id) ON DELETE SET NULL;
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
+CREATE INDEX IF NOT EXISTS idx_reviews_user_id ON reviews (user_id);
 
 CREATE TABLE IF NOT EXISTS watchlist (
   w_id SERIAL PRIMARY KEY,

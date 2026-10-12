@@ -304,86 +304,6 @@ async function loadDetails() {
   }
 }
 
-// ---------- REVIEWS ----------
-
-function getMovieTitleFromUrl() {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("t") || params.get("title") || "";
-}
-
-async function loadReviews() {
-  const movieTitle = getMovieTitleFromUrl();
-  if (!movieTitle) return;
-
-  try {
-    const res = await fetch(
-      `${API_BASE}/api/reviews?movieTitle=${encodeURIComponent(movieTitle)}`
-    );
-    if (!res.ok) throw new Error("Failed to fetch reviews");
-
-    const reviews = await res.json();
-    const list = document.getElementById("reviews-list");
-    if (!list) return;
-
-    list.innerHTML = "";
-
-    if (!reviews.length) {
-      list.innerHTML = "<li>No reviews yet. Be the first to review!</li>";
-      return;
-    }
-
-    reviews.forEach((r) => {
-      const li = document.createElement("li");
-      li.textContent = `${r.rating}/5 – ${r.comment}`;
-      list.appendChild(li);
-    });
-  } catch (err) {
-    console.error(err);
-  }
-}
-
-function hookReviewForm() {
-  const form = document.getElementById("reviewForm");
-  if (!form) return;
-
-  const movieTitle = getMovieTitleFromUrl();
-  const hidden = document.getElementById("movieIdInput");
-  if (hidden) hidden.value = movieTitle;
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    const rating = Number(document.getElementById("rating").value);
-    const comment = document.getElementById("comment").value.trim();
-
-    if (!rating || !comment) {
-      alert("Please select a rating and enter a comment.");
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API_BASE}/api/reviews`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ movieTitle, rating, comment }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        alert("Error submitting review: " + (err.message || res.statusText));
-        return;
-      }
-
-      alert("Review submitted!");
-      form.reset();
-      await loadReviews(); // refresh list
-    } catch (err) {
-      console.error("Review submit failed:", err);
-      alert("Network error submitting review.");
-    }
-  });
-}
-
 const savedMovieIds = new Set();
 let watchlistReady = false;
 
@@ -448,10 +368,7 @@ document.addEventListener("DOMContentLoaded", () => {
     loadMovies(1, "");
   }
   if (document.getElementById("movieDetail")) {
-    loadDetails().then(loadReviews); // show reviews for this movie
-  }
-  if (document.getElementById("reviewForm")) {
-    hookReviewForm();
+    loadDetails();
   }
 });
 

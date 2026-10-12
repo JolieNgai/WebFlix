@@ -13,7 +13,7 @@
 <div id="movieDetail" aria-live="polite"></div>
 <section id="related-section" class="related-section" aria-labelledby="related-heading"><h2 id="related-heading">Related movies</h2><div id="related-movies" class="related-grid"><p>Choose a movie to discover more from the collection.</p></div></section>
 <section class="reviews-section" id="reviews">
-<div><span class="section-kicker">JOIN THE CONVERSATION</span><h2>Leave a review</h2><form id="reviewForm"><input type="hidden" id="movieIdInput"><div class="mb-3"><label for="rating" class="form-label">Your rating</label><select id="rating" class="form-select" required><option value="">Select a rating</option><option value="1">1 - Very bad</option><option value="2">2 - Bad</option><option value="3">3 - Okay</option><option value="4">4 - Good</option><option value="5">5 - Great</option></select></div><div class="mb-3"><label for="comment" class="form-label">Your perspective</label><textarea id="comment" class="form-control" rows="4" placeholder="What stayed with you?" required></textarea></div><button type="submit" class="btn btn-primary">Publish review &rarr;</button></form></div>
+<div><span class="section-kicker">JOIN THE CONVERSATION</span><h2 id="review-form-heading">Leave a review</h2><p id="review-login-prompt" hidden><a href="login.html">Log in</a> to write a review.</p><p id="review-status" class="small" role="status" aria-live="polite"></p><form id="reviewForm"><input type="hidden" id="movieIdInput"><div class="mb-3"><label for="rating" class="form-label">Your rating</label><select id="rating" class="form-select" required><option value="">Select a rating</option><option value="1">1 - Very bad</option><option value="2">2 - Bad</option><option value="3">3 - Okay</option><option value="4">4 - Good</option><option value="5">5 - Great</option></select></div><div class="mb-3"><label for="comment" class="form-label">Your perspective</label><textarea id="comment" maxlength="5000" class="form-control" rows="4" placeholder="What stayed with you?" required></textarea></div><button id="review-submit" type="submit" class="btn btn-primary">Publish review</button> <button id="review-cancel" type="button" class="btn btn-outline-secondary" hidden>Cancel edit</button></form></div>
 <div><span class="section-kicker">FROM THE COMMUNITY</span><h2>Audience reviews</h2><ul id="reviews-list" aria-live="polite"></ul></div>
 </section>
 </main>
@@ -22,6 +22,7 @@
 <script src="js/config.js"></script>
 <script src="js/main.js"></script>
 <script src="js/movies.js"></script>
+<script src="js/reviews.js"></script>
 
 </body>
 </html>

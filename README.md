@@ -7,7 +7,7 @@ WebFlix is an INF2003 movie catalog and review web application built with HTML, 
 - Browse and search movies with pagination.
 - View movie details, posters, genres, and ratings.
 - Register and log in with bcrypt password hashing and JWT authentication.
-- Read and submit reviews with ratings from 1 to 5.
+- Read reviews publicly; log in to post ratings from 1 to 5 and edit or delete your own reviews.
 - View a profile and add or remove movies from a personal watchlist.
 
 Watchlists are linked to your account. Saved movie details appear on your profile, and save buttons reflect your persisted watchlist after refreshing. Entries whose movies were removed can still be deleted from your watchlist.
@@ -219,7 +219,7 @@ Browse the catalog, search for a movie, register an account, log in, and submit 
 | `npm run dev` | Start the API with nodemon. |
 | `npm start` | Start the API with Node.js. |
 | `npm run db:init` | Initialize PostgreSQL tables; reads `postgre.env` by default. |
-| `npm test` | Placeholder that exits with an error; no automated test suite is configured. |
+| `npm test` | Placeholder that exits with an error; use the explicit verification commands below to run the available tests. |
 
 For local environment loading, use the `node --env-file=.env --run=...` commands above.
 
@@ -233,7 +233,9 @@ Paths are relative to the API base URL.
 | GET | `/api/movies` | List movies; accepts `page`, `limit`, `q`, and `minRating`. |
 | GET | `/api/movies/by-title/:title` | Get a movie by its URL-encoded title. |
 | GET | `/api/reviews` | List reviews; optionally filter by `movieTitle`. |
-| POST | `/api/reviews` | Submit `movieTitle`, `rating`, and `comment`. |
+| POST | `/api/reviews` | Authenticated: submit `movieTitle`, `rating`, and `comment`. |
+| PATCH | `/api/reviews/:id` | Owner only: update `rating` and `comment`. |
+| DELETE | `/api/reviews/:id` | Owner only: delete a review. |
 | POST | `/api/register` | Register with `name`, `email`, and `password`. |
 | POST | `/api/login` | Log in with `email` and `password`. |
 | GET | `/api/user/me` | Get the authenticated user's profile. |
@@ -241,7 +243,7 @@ Paths are relative to the API base URL.
 | POST | `/api/watchlist/add` | Save a movie using `movie_id`. |
 | DELETE | `/api/watchlist/remove` | Remove a movie using `movie_id`. |
 
-Profile and watchlist endpoints require `Authorization: Bearer <token>`. Login tokens expire after one hour. The current review endpoints do not require authentication.
+Profile and watchlist endpoints require `Authorization: Bearer <token>`. Login tokens expire after one hour. Review creation, editing, and deletion require a token. Reading reviews remains public. Ownership comes from the authenticated account, never the request body.
 
 ## Project structure
 
@@ -314,3 +316,33 @@ docker compose exec -T backend node --test backend/tests/watchlist.test.js
 The integration test creates temporary accounts and one movie, then removes them.
 It checks saved movie details, duplicate saves, account isolation, malformed IDs,
 and removal of references to deleted movies.
+
+## Review ownership
+
+Each new review stores the authenticated user's ID in `reviews.user_id`, which
+references `users.u_id`. Public review responses include `user_id`, `author_name`,
+and `updated_at`. Users can edit their rating/comment or delete their own reviews;
+the server includes the owner in each update/delete query.
+
+The schema initializer upgrades existing tables without dropping data. Reviews
+created before ownership was added retain a null owner and appear as **Legacy review**.
+They remain publicly readable and cannot be claimed, edited, or deleted through
+the review API. The owner column stays nullable to preserve these historical rows
+and reviews from deleted accounts (`ON DELETE SET NULL`); all new API submissions
+require a valid authenticated owner.
+
+Docker applies this upgrade when the `setup` service runs during
+`docker compose up --build -d`. For a non-Docker setup, run the documented database
+initialization command before starting the new backend. Comments must contain
+1 to 5000 characters and ratings must be integers from 1 to 5.
+
+Verify review permissions and frontend behavior:
+
+```sh
+node --test tests/reviews-ui.test.mjs tests/watchlist-ui.test.mjs
+docker compose exec -T backend node --test backend/tests/reviews.test.js backend/tests/watchlist.test.js
+```
+
+Integration tests create and remove their own temporary data, and check unauthenticated
+requests, cross-account edits/deletions, spoofed owner IDs, foreign keys, validation,
+and repeatable schema initialization.

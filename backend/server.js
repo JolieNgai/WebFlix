@@ -8,13 +8,15 @@ import { MongoClient, ServerApiVersion } from "mongodb";
 import { pgHealth, closePg, pgQuery } from "./config/postgres.js";
 import { authRouter, verifyToken } from "./routes/authenticate.js";
 import watchlistRoutes from "./routes/watchlist.js";
+import reviewRoutes from "./routes/reviews.js";
 
 console.log("🔧 Booting server.js …");
 
 const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
-app.use("/api", authRouter); 
+app.use("/api", authRouter);
+app.use("/api/reviews", reviewRoutes(pgQuery, verifyToken)); 
 
 const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
 if (!uri) throw new Error("Set MONGODB_URI or MONGO_URI before starting the API.");
@@ -288,35 +290,6 @@ app.get("/api/movies", async (req, res) => {
   }
 });
 
-app.get("/api/reviews", async (req, res) => {
-  const { movieTitle } = req.query;
-
-  try {
-    let result;
-    if (movieTitle) {
-      result = await pgQuery(
-        `SELECT r_id, movie_title, rating, comment, created_at
-         FROM reviews
-         WHERE movie_title = $1
-         ORDER BY created_at DESC`,
-        [movieTitle]
-      );
-    } else {
-      result = await pgQuery(
-        `SELECT r_id, movie_title, rating, comment, created_at
-         FROM reviews
-         ORDER BY created_at DESC`
-      );
-    }
-
-    res.json(result.rows);
-  } catch (err) {
-    console.error("❌ Error fetching reviews:", err);
-    res.status(500).json({ error: "Failed to fetch reviews" });
-  }
-});
-
-
 // Detailed single movie by title (case-insensitive exact match)
 app.get("/api/movies/by-title/:title", async (req, res) => {
   if (!Movies) {
@@ -367,28 +340,6 @@ app.get("/api/movies/by-title/:title", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-app.post("/api/reviews", async (req, res) => {
-  try {
-    const { movieTitle, rating, comment } = req.body;
-
-    if (!movieTitle || !rating || !comment) {
-      return res.status(400).json({ message: "Missing fields" });
-    }
-
-    await pgQuery(
-      `INSERT INTO reviews (movie_title, rating, comment)
-       VALUES ($1, $2, $3)`,
-      [movieTitle, rating, comment]
-    );
-
-    res.status(201).json({ message: "Review saved" });
-  } catch (err) {
-    console.error("❌ Error inserting review:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
 
 // ============ Shutdown handling ============
 

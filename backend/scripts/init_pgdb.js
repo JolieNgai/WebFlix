@@ -1,6 +1,3 @@
-import dotenv from "dotenv";
-dotenv.config({ path: "./postgre.env" }); 
-
 import { Client } from "pg";
 import { getPgOptions } from "../config/pg_options.js";
 import fs from "fs";

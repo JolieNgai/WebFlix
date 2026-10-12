@@ -12,7 +12,9 @@ services:
     restart: unless-stopped
 
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
     environment: &backend-environment
       PORT: "8080"
       MONGODB_URI: mongodb://mongo:27017
@@ -21,9 +23,9 @@ services:
       PGPORT: "5432"
       PGDATABASE: webflix
       PGUSER: webflix
-      PGPASSWORD: ${WEBFLIX_POSTGRES_PASSWORD:-webflix-local-dev}
+      PGPASSWORD: ${WEBFLIX_POSTGRES_PASSWORD:?Generate .env using scripts/setup-docker.ps1}
       PGSSL: "false"
-      JWT_SECRET: ${WEBFLIX_JWT_SECRET:-webflix-local-development-only-change-before-hosting}
+      JWT_SECRET: ${WEBFLIX_JWT_SECRET:?Generate .env using scripts/setup-docker.ps1}
     depends_on:
       setup:
         condition: service_completed_successfully
@@ -36,7 +38,9 @@ services:
     restart: unless-stopped
 
   setup:
-    build: .
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
     environment: *backend-environment
     command: ["sh", "-c", "node backend/scripts/init_pgdb.js && node backend/scripts/seed_movies.js && node backend/scripts/migrate_review_movie_ids.js"]
     depends_on:
@@ -51,7 +55,7 @@ services:
     environment:
       POSTGRES_DB: webflix
       POSTGRES_USER: webflix
-      POSTGRES_PASSWORD: ${WEBFLIX_POSTGRES_PASSWORD:-webflix-local-dev}
+      POSTGRES_PASSWORD: ${WEBFLIX_POSTGRES_PASSWORD:?Generate .env using scripts/setup-docker.ps1}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

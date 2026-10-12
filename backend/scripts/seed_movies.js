@@ -1,12 +1,11 @@
-import "dotenv/config";
+import { getMongoOptions } from "../config/env.js";
 import { MongoClient } from "mongodb";
 
-const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
-if (!uri) throw new Error("MONGODB_URI is required to seed movies.");
+const { uri, database } = getMongoOptions();
 const client = new MongoClient(uri);
 try {
   await client.connect();
-  const movies = client.db(process.env.DB_NAME || "inf2003_db").collection("movies_metadata");
+  const movies = client.db(database).collection("movies_metadata");
   if (await movies.countDocuments({}) === 0) {
     // Original fictional fixtures for local development, not real film metadata.
     const samples = [

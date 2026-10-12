@@ -1,5 +1,4 @@
-﻿import dotenv from "dotenv";
-dotenv.config();
+﻿import { getMongoOptions } from "./config/env.js";
 
 import express from "express";
 import cors from "cors";
@@ -18,10 +17,7 @@ app.use(express.json());
 app.use("/api", authRouter);
 app.use("/api/reviews", reviewRoutes(pgQuery, verifyToken, () => Movies)); 
 
-const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
-if (!uri) throw new Error("Set MONGODB_URI or MONGO_URI before starting the API.");
-
-const dbName = process.env.DB_NAME || "inf2003_db";
+const { uri, database: dbName } = getMongoOptions();
 console.log("🧩 ENV:", { hasURI: !!uri, dbName });
 
 const client = new MongoClient(uri, {

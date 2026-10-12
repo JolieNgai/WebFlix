@@ -25,7 +25,7 @@ function setup() {
     URLSearchParams,console,Date
   };
   vm.createContext(context);
-  vm.runInContext(fs.readFileSync(new URL("../js/reviews.js",import.meta.url),"utf8"),context);
+  vm.runInContext(fs.readFileSync(new URL("../frontend/js/reviews.js",import.meta.url),"utf8"),context);
   return {context,get};
 }
 

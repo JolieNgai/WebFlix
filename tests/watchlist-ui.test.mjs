@@ -15,7 +15,7 @@ function setup() {
     console, URL, URLSearchParams
   };
   vm.createContext(context);
-  vm.runInContext(fs.readFileSync(new URL("../js/movies.js", import.meta.url), "utf8"), context);
+  vm.runInContext(fs.readFileSync(new URL("../frontend/js/movies.js", import.meta.url), "utf8"), context);
   const attributes = {};
   const button = { disabled: false, textContent: "", title: "", classList: { toggle() {} }, setAttribute(key,value) { attributes[key]=value; } };
   context.button = button;
@@ -92,7 +92,7 @@ test("profile renders saved movie details and keeps the card when removal fails"
     }
   };
   vm.createContext(context);
-  vm.runInContext(fs.readFileSync(new URL("../js/profile.js", import.meta.url), "utf8"), context);
+  vm.runInContext(fs.readFileSync(new URL("../frontend/js/profile.js", import.meta.url), "utf8"), context);
   await vm.runInContext("loadWatchlist()", context);
   const card = container.children[0].children[0];
   const image = card.children[0];

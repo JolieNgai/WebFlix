@@ -1,4 +1,4 @@
-import "dotenv/config";
+import { getMongoOptions } from "../config/env.js";
 import { MongoClient } from "mongodb";
 import { Client } from "pg";
 import { getPgOptions } from "../config/pg_options.js";
@@ -24,14 +24,13 @@ export async function migrateReviewMovieIds(pg, Movies) {
 }
 
 export async function runReviewMovieMigration() {
-  const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
-  if (!uri) throw new Error("MONGODB_URI is required to migrate review movie references.");
+  const { uri, database } = getMongoOptions();
   const mongo = new MongoClient(uri);
   const pg = new Client(getPgOptions());
   try {
     await mongo.connect();
     await pg.connect();
-    const summary = await migrateReviewMovieIds(pg, mongo.db(process.env.DB_NAME || "inf2003_db").collection("movies_metadata"));
+    const summary = await migrateReviewMovieIds(pg, mongo.db(database).collection("movies_metadata"));
     console.log("Review movie-ID migration:", summary);
   } finally {
     await pg.end();

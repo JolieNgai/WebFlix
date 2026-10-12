@@ -28,9 +28,10 @@ This runs the frontend, Express API, MongoDB, and PostgreSQL on your computer.
 It does not depend on the existing cloud databases or migrate their data.
 
 1. Install Docker Desktop and start it using Linux containers.
-2. From the project root, run:
+2. Generate private local credentials once, then start the containers from the project root:
 
-```sh
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-docker.ps1
 docker compose up --build -d
 ```
 
@@ -75,8 +76,8 @@ local accounts, reviews, watchlists, and movies; only use it for an intentional 
 
 ### Optional local configuration
 
-Compose uses development defaults. To customize them, add these variables to
-the root `.env` file before the first start:
+Compose requires credentials in the root `.env` file. The setup script generates
+random values and preserves existing values. To configure them manually, supply:
 
 ```dotenv
 WEBFLIX_POSTGRES_PASSWORD=your-local-database-password
@@ -99,25 +100,22 @@ the containers to a host and configure production credentials, TLS, and database
 - **Setup or backend is unhealthy:** inspect `docker compose logs setup backend mongo postgres`.
 - **Old code is showing:** rebuild with `docker compose up --build -d` and refresh the browser.
 - **Movie fixtures are missing:** the seed intentionally skips nonempty collections; inspect the `setup` logs.
-- **Using Live Server instead of Docker:** local pages use `js/config.js`, which connects to the Docker API at port 5500. Keep Docker running.
+- **Using Live Server instead of Docker:** local pages use `frontend/js/config.js`, which connects to the Docker API at port 5500. Keep Docker running.
 
 ## Run the frontend
 
-Local pages connect to Docker at port 5500 by default. For the cloud API, set `window.WEBFLIX_API_BASE` in `js/config.js` to this address:
+Local pages connect to Docker at port 5500 by default. To use a deployed API,
+set `window.WEBFLIX_API_BASE` in `frontend/js/config.js` to its public HTTPS URL.
 
-```text
-https://inf2003-backend-161924392.asia-southeast1.run.app
-```
-
-To use the configured API, open the project in VS Code and use **Open with Live Server** on `index.html` if the Live Server extension is installed.
+To use the configured API, open the project in VS Code and use **Open with Live Server** on `frontend/index.html` if the Live Server extension is installed.
 
 Alternatively, with Python 3 installed, run this from the project root:
 
 ```sh
-python -m http.server 5500
+python -m http.server 5501 --directory frontend
 ```
 
-Open **http://localhost:5500**. On Windows, use `py -m http.server 5500` if `python` is unavailable.
+Open **http://localhost:5501**. On Windows, use `py -m http.server 5501 --directory frontend` if `python` is unavailable.
 
 An HTTP server is needed because the frontend fetches shared navbar and footer files. Backend dependencies are not required for this option. Docker must be running for the default local API, or the configured cloud API must be available for data and login to work; Bootstrap and movie images also require internet access.
 
@@ -125,9 +123,9 @@ An HTTP server is needed because the frontend fetches shared navbar and footer f
 
 ### 1. Prerequisites
 
-- Node.js 22 or newer and npm for the environment-loading commands below.
+- Node.js 22 or newer and npm.
 - A reachable MongoDB instance with movie data.
-- An existing PostgreSQL database with SSL enabled; the backend always enables SSL.
+- A reachable PostgreSQL database (SSL enabled by default; disable it only for local development).
 - A static HTTP server for the frontend.
 
 Run all commands from the project root.
@@ -156,21 +154,22 @@ JWT_SECRET=replace-with-a-long-random-secret
 | `MONGODB_URI` | MongoDB connection string; `MONGO_URI` is also accepted as a fallback. |
 | `DB_NAME` | MongoDB database name; defaults to `inf2003_db`. |
 | `DATABASE_URL` | PostgreSQL connection string. URL-encode special characters in credentials. |
-| `JWT_SECRET` | Secret for signing and verifying login tokens. |
+| `JWT_SECRET` | Secret for signing and verifying login tokens; at least 32 characters. |
+| `PGSSL` | SSL enabled by default; set `false` only for local development PostgreSQL. |
 
-Always set your own MongoDB URI. Keep credentials out of source control; `.env` and `postgre.env` are ignored by this repository.
+Always set your own MongoDB URI. Keep credentials out of source control; `.env` and legacy `postgre.env` are ignored by this repository. Runtime and initialization now both read only the root `.env` file; move any legacy values from `postgre.env` into `.env`.
 
 ### 4. Prepare the databases
 
 Create the PostgreSQL database named in `DATABASE_URL` first, then initialize its tables:
 
 ```sh
-node --env-file=.env --run=db:init
+npm run db:init
 ```
 
 This executes `database/create_table.sql`, creating `users`, `reviews`, and `watchlist` tables if they do not already exist.
 
-The initializer normally reads `postgre.env`, while the server reads `.env`. The command above explicitly loads `.env` so both use the same connection string. The initializer uses the connection string's SSL settings; include your provider's required SSL options in `DATABASE_URL`.
+The initializer and server share the same PostgreSQL options and load the same root `.env` file. Shell or deployment variables take precedence. SSL certificate verification is enabled by default; Compose explicitly sets `PGSSL=false` for its isolated local PostgreSQL network.
 
 In MongoDB, create a `movies_metadata` collection in the database specified by `DB_NAME` and populate it with movie documents. The catalog expects fields such as `title`, `release_date`, `vote_average`, `overview`, `genres`, and `poster_path`. The Docker setup includes a fictional demo seed; no real movie-data import is included. The Python configuration files, Python requirements file, and JSON backup in this checkout are empty.
 
@@ -179,20 +178,20 @@ In MongoDB, create a `movies_metadata` collection in the database specified by `
 Development mode with automatic restart:
 
 ```sh
-node --env-file=.env --run=dev
+npm run dev
 ```
 
 Normal start:
 
 ```sh
-node --env-file=.env --run=start
+npm start
 ```
 
-Loading the environment before startup ensures the PostgreSQL pool receives its settings before imported modules initialize. If variables are already set in your shell or deployment environment, use `npm run dev` or `npm start` directly.
+All entry points automatically load the root `.env`; existing shell variables take precedence.
 
 ### 6. Connect the frontend
 
-For a non-Docker local backend, change `js/config.js` to your local API address.
+For a non-Docker local backend, change `frontend/js/config.js` to your local API address.
 
 For the default port:
 
@@ -200,7 +199,7 @@ For the default port:
 window.WEBFLIX_API_BASE = "http://localhost:8080";
 ```
 
-Start the frontend HTTP server in a separate terminal and open **http://localhost:5500**. Express serves the API only; it does not serve the frontend pages.
+Start the frontend HTTP server in a separate terminal and open **http://localhost:5501**. Express serves the API only; it does not serve the frontend pages.
 
 ## Verify the setup
 
@@ -218,10 +217,12 @@ Browse the catalog, search for a movie, register an account, log in, and submit 
 | --- | --- |
 | `npm run dev` | Start the API with nodemon. |
 | `npm start` | Start the API with Node.js. |
-| `npm run db:init` | Initialize PostgreSQL tables; reads `postgre.env` by default. |
-| `npm test` | Placeholder that exits with an error; use the explicit verification commands below to run the available tests. |
+| `npm run db:init` | Initialize PostgreSQL tables using the same configuration as the server. |
+| `npm test` | Run frontend behavior tests; no databases required. |
+| `npm run test:integration` | Run backend tests against configured databases and a running API. |
+| `npm run db:migrate` | Migrate unambiguous legacy title references to stable movie IDs. |
 
-For local environment loading, use the `node --env-file=.env --run=...` commands above.
+All backend commands load the root `.env` automatically.
 
 ## API overview
 
@@ -250,73 +251,73 @@ Profile and watchlist endpoints require `Authorization: Bearer <token>`. Login t
 
 ```text
 WebFlix/
+  frontend/                  # Static site; serve this directory over HTTP
+    *.html                   # Pages and shared navbar/footer
+    assets/                  # Images and placeholders
+    css/style.css            # Shared styles
+    js/                      # API configuration and page behavior
   backend/
-    server.js                 # Express API and MongoDB connection
-    config/postgres.js        # PostgreSQL connection pool
-    config/*.py               # Empty legacy configuration files
-    routes/authenticate.js    # Registration, login, and profile
-    routes/watchlist.js       # Authenticated watchlist routes
-    services/user_services.js # User queries and password hashing
-    scripts/init_pgdb.js      # PostgreSQL schema initializer
-  database/
-    create_table.sql          # Users, reviews, and watchlist schema
-    tmdb_raw_data.json        # Empty movie-data backup placeholder
-  css/style.css               # Shared styling
-  js/
-    main.js                   # Shared navbar and footer
-    movies.js                 # Catalog, details, reviews, watchlist actions
-    auth.js                   # Registration and login UI
-    profile.js                # Profile and watchlist UI
-  index.html                  # Movie catalog
-  movie.html                  # Movie details and reviews
-  login.html
-  register.html
-  profile.html
-  navbar.html
-  footer.html
-  compose.yaml                # Local frontend, API, and databases
-  Dockerfile                  # Backend image
-  docker/                     # nginx frontend image and configuration
-  package.json
-  package-lock.json
+    server.js                # Express entry point
+    config/                  # Environment loading and database connections
+    routes/                  # Authentication, reviews, watchlist handlers
+    services/                # User queries and password hashing
+    scripts/                 # Schema initialization, seed, ID migration
+    tests/                   # API/database integration tests
+  database/                  # PostgreSQL schema and legacy data placeholders
+  docker/                    # Backend/frontend Dockerfiles and nginx config
+  scripts/setup-docker.ps1   # Generate private Docker credentials
+  tests/                     # Frontend behavior tests
+  .editorconfig              # Shared whitespace and encoding conventions
+  .env.example               # Configuration template; .env stays private
+  compose.yaml               # Local application and database orchestration
+  package.json               # Shared Node dependencies and commands
+  package-lock.json          # Reproducible dependency versions
   README.md
 ```
 
+Keep browser code in `frontend/`, request handlers in `backend/routes/`, shared
+configuration in `backend/config/`, and operational scripts in the script folders.
+Keep relative browser URLs rooted in the frontend directory so public URLs stay
+unchanged in Docker. Follow `.editorconfig`, use ES modules in backend code, and
+update relevant tests and documentation when changing behavior.
+
 ## Troubleshooting
 
-- **Frontend still uses cloud data:** update `js/config.js` for non-Docker runs and refresh the browser. Docker configures the API automatically.
+- **Frontend still uses cloud data:** update `frontend/js/config.js` for non-Docker runs and refresh the browser. Docker configures the API automatically.
 - **MongoDB connection fails:** check the URI, credentials, and network access rules. Movie routes require a connection; watchlist routes are registered only after MongoDB initialization succeeds.
-- **PostgreSQL connection fails:** check `DATABASE_URL`, SSL support, and network access. Use the explicit environment-loading command above.
+- **PostgreSQL connection fails:** check `DATABASE_URL`, SSL support, and network access. Initialization and startup use the same root `.env`.
 - **Tables do not exist:** initialize the same database used by the server.
 - **Profile or watchlist returns 401:** log in again; the token may have expired.
 - **Navbar or footer fails to load:** serve the frontend over HTTP.
 
 ## Contributing
 
-Keep changes focused, describe how to run and verify them, and update this README when setup or API behavior changes. Never commit database passwords or JWT secrets.
+Keep changes focused, describe how to run and verify them, and update this README when setup or API behavior changes. Follow `.editorconfig` and the folder responsibilities above. Never commit database passwords or JWT secrets.
 
 ## License
 
 `package.json` declares ISC. No standalone license file is currently included.
 
 
-## Watchlist verification
+## Testing
 
-Run the frontend state and profile rendering tests with Node.js:
-
-```sh
-node --test tests/watchlist-ui.test.mjs
-```
-
-With Docker running, test the API against both databases:
+With Node.js installed, run the frontend tests from the project root. If Windows
+PowerShell blocks `npm.ps1`, use `npm.cmd` in place of `npm` for these commands:
 
 ```sh
-docker compose exec -T backend node --test backend/tests/watchlist.test.js
+npm test
 ```
 
-The integration test creates temporary accounts and one movie, then removes them.
-It checks saved movie details, duplicate saves, account isolation, malformed IDs,
-and removal of references to deleted movies.
+With Docker running, run the API/database suite:
+
+```sh
+docker compose exec -T backend npm run test:integration
+```
+
+Integration tests create and remove temporary accounts, reviews, watchlist entries,
+and movies. Run them against a development database. They check configuration,
+authentication, ownership, account isolation, stable IDs, migrations, and watchlist
+behavior. Frontend tests cover saved state, review controls, and movie links.
 
 ## Review ownership
 
@@ -336,17 +337,6 @@ Docker applies this upgrade when the `setup` service runs during
 `docker compose up --build -d`. For a non-Docker setup, run the documented database
 initialization command before starting the new backend. Comments must contain
 1 to 5000 characters and ratings must be integers from 1 to 5.
-
-Verify review permissions and frontend behavior:
-
-```sh
-node --test tests/reviews-ui.test.mjs tests/watchlist-ui.test.mjs
-docker compose exec -T backend node --test backend/tests/reviews.test.js backend/tests/watchlist.test.js
-```
-
-Integration tests create and remove their own temporary data, and check unauthenticated
-requests, cross-account edits/deletions, spoofed owner IDs, foreign keys, validation,
-and repeatable schema initialization.
 
 ## Stable movie references
 
@@ -376,7 +366,7 @@ values when importing or restoring movie data.
 For non-Docker databases, initialize the schema, then run:
 
 ```sh
-node --env-file=.env backend/scripts/migrate_review_movie_ids.js
+npm run db:migrate
 ```
 
 To inspect unresolved references in PostgreSQL:
@@ -388,9 +378,26 @@ WHERE movie_id IS NULL
 ORDER BY r_id;
 ```
 
-Verify ID links, title collisions, renames, migrations, and permissions:
+## Configuration and credential rotation
 
-```sh
-node --test tests/movie-reference.test.mjs tests/reviews-ui.test.mjs tests/watchlist-ui.test.mjs
-docker compose exec -T backend node --test backend/tests/movie-ids.test.js backend/tests/reviews.test.js backend/tests/watchlist.test.js
-```
+All backend entry points load the project-root `.env` through `backend/config/env.js`.
+Existing environment variables take precedence. PostgreSQL connections share
+`getPgOptions()` for server startup, schema initialization, and ID migration.
+MongoDB setup uses `getMongoOptions()`. No database password or JWT secret has a
+fallback value. Missing configuration produces a clear startup error.
+
+`.env.example` contains variable names and placeholders only. `.env` is ignored by
+Git and excluded from Docker build contexts. Never run `docker compose config`
+without `--quiet` when sharing diagnostics because resolved environment values
+include secrets.
+
+Rotating the JWT signing secret invalidates existing login tokens; log in again afterward.
+The setup script preserves an existing `.env` and is not a rotation command. For an
+existing PostgreSQL volume, changing a file or container variable alone does not
+change its stored password; update the database role password and application
+configuration together.
+
+Previously exposed cloud credentials must also be changed in MongoDB Atlas and the
+PostgreSQL provider's dashboard, then updated in the hosted backend's secret settings.
+Removing a secret from source does not invalidate a copy in Git history. Those cloud
+credentials cannot be rotated through the local Docker database.

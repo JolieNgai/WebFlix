@@ -2,13 +2,15 @@
   "name": "inf2003-project",
   "version": "1.0.0",
   "type": "module",
-  "description": "",
-  "main": "index.js",
+  "description": "Movie catalog, reviews, and personal watchlists with MongoDB and PostgreSQL",
+  "main": "backend/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test tests/*.test.mjs",
     "dev": "nodemon backend/server.js",
     "start": "node backend/server.js",
-    "db:init": "node backend/scripts/init_pgdb.js"
+    "db:init": "node backend/scripts/init_pgdb.js",
+    "test:integration": "node --test backend/tests/*.test.js",
+    "db:migrate": "node backend/scripts/migrate_review_movie_ids.js"
   },
   "keywords": [],
   "author": "",

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
-const source=fs.readFileSync(new URL("../js/movie-reference.js",import.meta.url),"utf8");
+const source=fs.readFileSync(new URL("../frontend/js/movie-reference.js",import.meta.url),"utf8");
 function setup(search,fetch) {
   const context={URL,URLSearchParams,fetch,window:{WEBFLIX_API_BASE:"",location:{search,href:"http://localhost:5500/movie.html"+search},history:{replaceState(a,b,url){context.canonical=url.href}}}};
   vm.createContext(context);vm.runInContext(source,context);return context;

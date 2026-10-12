@@ -1,7 +1,7 @@
 import express from "express";
 import jwt from "jsonwebtoken";
-import dotenv from "dotenv";
-dotenv.config();
+import { getJwtSecret } from "../config/env.js";
+const jwtSecret = getJwtSecret();
 
 import { pgQuery } from "../config/postgres.js";
 import { registerUser, loginUser } from "../services/user_services.js";
@@ -51,7 +51,7 @@ authRouter.post("/login", async (req, res) => {
 
     const token = jwt.sign(
       { user_id: userId },
-      process.env.JWT_SECRET,
+      jwtSecret,
       { expiresIn: "1h" }
     );
 
@@ -72,7 +72,7 @@ export function verifyToken(req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, jwtSecret);
     req.user = { id: decoded.user_id };
     next();
   } catch (err) {

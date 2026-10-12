@@ -2,13 +2,12 @@ import dotenv from "dotenv";
 dotenv.config({ path: "./postgre.env" }); 
 
 import { Client } from "pg";
+import { getPgOptions } from "../config/pg_options.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 async function main() {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-  });
+  const client = new Client(getPgOptions());
 
   try {
     console.log("connecting to postgresql");

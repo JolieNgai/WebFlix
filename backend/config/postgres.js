@@ -1,32 +1,9 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-// Build config from env with safe defaults
-const pgConfig = {
-  host: process.env.PGHOST ?? "localhost",
-  port: Number(process.env.PGPORT ?? 5432),
-  database: process.env.PGDATABASE ?? "userdb",
-  user: process.env.PGUSER ?? "postgres",
-  // force password to always be a string
-  password:
-    process.env.PGPASSWORD !== undefined
-      ? String(process.env.PGPASSWORD)
-      : "joliengai",
-};
+import { getPgOptions } from "./pg_options.js";
 
-console.log("🔌 PG config (masked):", {
-  host: pgConfig.host,
-  port: pgConfig.port,
-  database: pgConfig.database,
-  user: pgConfig.user,
-  password: pgConfig.password ? "***" : "(none)",
-});
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },   // <-- turn SSL on
-});
-
+const pool = new Pool(getPgOptions());
 
 // Generic query helper
 export async function pgQuery(text, params = []) {

@@ -1,0 +1,8 @@
+node_modules
+.git
+.env
+*.env
+**/*.env
+*.log
+README.md
+database/tmdb_raw_data.json

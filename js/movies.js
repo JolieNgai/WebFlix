@@ -1,4 +1,4 @@
-const API_BASE = "https://inf2003-backend-161924392.asia-southeast1.run.app";
+const API_BASE = window.WEBFLIX_API_BASE ?? "https://inf2003-backend-161924392.asia-southeast1.run.app";
 const PLACEHOLDER_CARD = "assets/poster-placeholder.svg";
 const PLACEHOLDER_DETAIL = "assets/poster-placeholder.svg";
 
@@ -133,7 +133,7 @@ async function loadMovies(page = 1, q = null) {
   if (pager) pager.innerHTML = "";
 
   try {
-    const url = new URL(`${API_BASE}/api/movies`);
+    const url = new URL(`${API_BASE}/api/movies`, window.location.origin);
     url.searchParams.set("limit", 24);
     url.searchParams.set("page", page);
     // only movies with rating > 0

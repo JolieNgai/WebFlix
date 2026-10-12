@@ -22,6 +22,84 @@ WebFlix is an INF2003 movie catalog and review web application built with HTML, 
 | Authentication | JWT, bcrypt |
 | Development | npm, nodemon |
 
+## Run everything with Docker (recommended for local development)
+
+This runs the frontend, Express API, MongoDB, and PostgreSQL on your computer.
+It does not depend on the existing cloud databases or migrate their data.
+
+1. Install Docker Desktop and start it using Linux containers.
+2. From the project root, run:
+
+```sh
+docker compose up --build -d
+```
+
+3. Open **http://localhost:5500**.
+4. Check **http://localhost:5500/health**; expect `{"ok":1,"mongo":1,"postgres":1}`.
+
+No local Node.js, Python, PostgreSQL, or MongoDB installation is needed.
+The first build downloads images and dependencies and may take several minutes.
+Stop Live Server first if it already uses port 5500.
+
+Compose waits for the databases to become healthy, runs the PostgreSQL schema
+initializer, and inserts six original fictional movie fixtures if MongoDB is empty.
+The sample movies use placeholder posters and are intended only for development.
+Existing movie data is left intact. Cloud movie data, users, and reviews are not copied.
+
+The frontend is served by nginx, which forwards `/api/` and `/health` to the backend.
+Docker supplies a same-origin API configuration automatically, so you do not need
+to change frontend URLs. The database ports are not published to your computer.
+
+### Everyday commands
+
+```sh
+# Check container status
+docker compose ps
+
+# Follow application and setup logs
+docker compose logs -f backend setup
+
+# Stop containers; database volumes remain
+docker compose down
+
+# Start again
+docker compose up -d
+
+# Rebuild after code changes
+docker compose up --build -d
+```
+
+MongoDB and PostgreSQL data live in named Docker volumes and survive stopping
+or recreating containers. `docker compose down -v` deletes those volumes and all
+local accounts, reviews, watchlists, and movies; only use it for an intentional reset.
+
+### Optional local configuration
+
+Compose uses development defaults. To customize them, add these variables to
+the root `.env` file before the first start:
+
+```dotenv
+WEBFLIX_POSTGRES_PASSWORD=your-local-database-password
+WEBFLIX_JWT_SECRET=your-long-random-secret
+```
+
+Use these exact names; Compose does not use your cloud `DATABASE_URL` or
+`MONGODB_URI`. Changing the PostgreSQL password in `.env` after a database volume
+already exists does not change the stored database password.
+
+Docker is a local development setup, not online hosting. Your laptop and Docker
+must be running to use it. To make the application publicly available, deploy
+the containers to a host and configure production credentials, TLS, and database access.
+
+### Docker troubleshooting
+
+- **Cannot connect to the Docker engine:** start Docker Desktop and wait until the Linux engine is ready.
+- **Port 5500 is already allocated:** stop Live Server or change the host port in `compose.yaml`.
+- **Setup or backend is unhealthy:** inspect `docker compose logs setup backend mongo postgres`.
+- **Old code is showing:** rebuild with `docker compose up --build -d` and refresh the browser.
+- **Movie fixtures are missing:** the seed intentionally skips nonempty collections; inspect the `setup` logs.
+- **Using Live Server instead of Docker:** it uses `js/config.js`, which points to the cloud API by default.
+
 ## Run the frontend
 
 The frontend is configured to call this Google Cloud Run API address:
@@ -93,7 +171,7 @@ This executes `database/create_table.sql`, creating `users`, `reviews`, and `wat
 
 The initializer normally reads `postgre.env`, while the server reads `.env`. The command above explicitly loads `.env` so both use the same connection string. The initializer uses the connection string's SSL settings; include your provider's required SSL options in `DATABASE_URL`.
 
-In MongoDB, create a `movies_metadata` collection in the database specified by `DB_NAME` and populate it with movie documents. The catalog expects fields such as `title`, `release_date`, `vote_average`, `overview`, `genres`, and `poster_path`. No automated movie import is included. The Python configuration files, Python requirements file, and JSON backup in this checkout are empty.
+In MongoDB, create a `movies_metadata` collection in the database specified by `DB_NAME` and populate it with movie documents. The catalog expects fields such as `title`, `release_date`, `vote_average`, `overview`, `genres`, and `poster_path`. The Docker setup includes a fictional demo seed; no real movie-data import is included. The Python configuration files, Python requirements file, and JSON backup in this checkout are empty.
 
 ### 5. Start the API
 
@@ -113,16 +191,12 @@ Loading the environment before startup ensures the PostgreSQL pool receives its 
 
 ### 6. Connect the frontend
 
-Change `API_BASE` in these files to your local API address:
-
-- `js/auth.js`
-- `js/movies.js`
-- `js/profile.js`
+For a non-Docker local backend, change `js/config.js` to your local API address.
 
 For the default port:
 
 ```js
-const API_BASE = "http://localhost:8080";
+window.WEBFLIX_API_BASE = "http://localhost:8080";
 ```
 
 Start the frontend HTTP server in a separate terminal and open **http://localhost:5500**. Express serves the API only; it does not serve the frontend pages.
@@ -196,6 +270,9 @@ WebFlix/
   profile.html
   navbar.html
   footer.html
+  compose.yaml                # Local frontend, API, and databases
+  Dockerfile                  # Backend image
+  docker/                     # nginx frontend image and configuration
   package.json
   package-lock.json
   README.md
@@ -203,7 +280,7 @@ WebFlix/
 
 ## Troubleshooting
 
-- **Frontend still uses cloud data:** update `API_BASE` in all three files and refresh the browser.
+- **Frontend still uses cloud data:** update `js/config.js` for non-Docker runs and refresh the browser. Docker configures the API automatically.
 - **MongoDB connection fails:** check the URI, credentials, and network access rules. Movie routes require a connection; watchlist routes are registered only after MongoDB initialization succeeds.
 - **PostgreSQL connection fails:** check `DATABASE_URL`, SSL support, and network access. Use the explicit environment-loading command above.
 - **Tables do not exist:** initialize the same database used by the server.

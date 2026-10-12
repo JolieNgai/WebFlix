@@ -16,10 +16,8 @@ app.use(cors({ origin: true }));
 app.use(express.json());
 app.use("/api", authRouter); 
 
-const uri =
-  process.env.MONGODB_URI ||
-  process.env.MONGO_URI ||
-  "mongodb+srv://chun:chunyuan@inf2003-db.gzrx4mf.mongodb.net/?appName=INF2003-DB";
+const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
+if (!uri) throw new Error("Set MONGODB_URI or MONGO_URI before starting the API.");
 
 const dbName = process.env.DB_NAME || "inf2003_db";
 console.log("🧩 ENV:", { hasURI: !!uri, dbName });

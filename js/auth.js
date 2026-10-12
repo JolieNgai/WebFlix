@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const API_BASE = "https://inf2003-backend-161924392.asia-southeast1.run.app";
+  const API_BASE = window.WEBFLIX_API_BASE ?? "https://inf2003-backend-161924392.asia-southeast1.run.app";
 
   const registerForm = document.getElementById("registerForm");
   const loginForm = document.getElementById("loginForm");

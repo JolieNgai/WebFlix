@@ -1,0 +1,77 @@
+name: webflix
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    ports:
+      - "127.0.0.1:5500:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  backend:
+    build: .
+    environment: &backend-environment
+      PORT: "8080"
+      MONGODB_URI: mongodb://mongo:27017
+      DB_NAME: inf2003_db
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: webflix
+      PGUSER: webflix
+      PGPASSWORD: ${WEBFLIX_POSTGRES_PASSWORD:-webflix-local-dev}
+      PGSSL: "false"
+      JWT_SECRET: ${WEBFLIX_JWT_SECRET:-webflix-local-development-only-change-before-hosting}
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>r.json()).then(d=>process.exit(d.ok===1?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  setup:
+    build: .
+    environment: *backend-environment
+    command: ["sh", "-c", "node backend/scripts/init_pgdb.js && node backend/scripts/seed_movies.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    restart: "no"
+
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: webflix
+      POSTGRES_USER: webflix
+      POSTGRES_PASSWORD: ${WEBFLIX_POSTGRES_PASSWORD:-webflix-local-dev}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U webflix -d webflix"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:8.0
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "quit(db.adminCommand({ping:1}).ok ? 0 : 1)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  mongo_data:

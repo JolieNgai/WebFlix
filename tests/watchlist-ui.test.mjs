@@ -100,7 +100,7 @@ test("profile renders saved movie details and keeps the card when removal fails"
   assert.equal(image.src, "assets/poster-placeholder.svg");
   assert.equal(body.children[0].textContent, "<Film & Friends>");
   assert.equal(body.children[1].textContent, "2024 / Drama");
-  assert.equal(body.children[2].href, "movie.html?t=%3CFilm%20%26%20Friends%3E");
+  assert.equal(body.children[2].href, "movie.html?id=abc");
   const button = body.children[3];
   await button.listeners.click();
   assert.equal(container.children[0].children[0], card);

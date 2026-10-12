@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { MongoClient, ObjectId } from "mongodb";
 import { pgQuery, closePg } from "../config/postgres.js";
 
 test("reviews enforce authenticated ownership, preserve legacy data, and validate content", async () => {
@@ -15,8 +16,12 @@ test("reviews enforce authenticated ownership, preserve legacy data, and validat
     });
     return { status: response.status, data: await response.json() };
   };
-  const body = { movieTitle: title, rating: 4, comment: "Original comment." };
+  const mongo = new MongoClient(process.env.MONGODB_URI || process.env.MONGO_URI);
+  const movieId = new ObjectId();
+  const body = { movieId: movieId.toString(), rating: 4, comment: "Original comment." };
   try {
+    await mongo.connect();
+    await mongo.db(process.env.DB_NAME || "inf2003_db").collection("movies_metadata").insertOne({_id: movieId, title});
     const accounts = [];
     for (const email of emails) {
       assert.equal((await request("/api/register", "POST", { name: email, email, password: "Test-only-123!" })).status, 201);
@@ -34,7 +39,7 @@ test("reviews enforce authenticated ownership, preserve legacy data, and validat
     assert.equal((await request("/api/reviews/" + id, "DELETE")).status, 401);
     assert.equal((await request("/api/reviews/" + id, "PATCH", body, b.token)).status, 404);
     assert.equal((await request("/api/reviews/" + id, "DELETE", undefined, b.token)).status, 404);
-    let visible = await request("/api/reviews?movieTitle=" + encodeURIComponent(title));
+    let visible = await request("/api/reviews?movieId=" + movieId.toString());
     assert.equal(visible.status, 200, "Reading reviews remains public");
     assert.equal(visible.data[0].author_name, emails[0]);
     assert.equal(visible.data[0].comment, body.comment);
@@ -61,10 +66,12 @@ test("reviews enforce authenticated ownership, preserve legacy data, and validat
     assert.equal((await request("/api/reviews/" + legacy.rows[0].r_id, "DELETE", undefined, a.token)).status, 404);
     await assert.rejects(pgQuery("INSERT INTO reviews (user_id, movie_title, rating, comment) VALUES (2147483647, $1, 3, 'Bad owner')", [title]), error => error.code === "23503");
     assert.equal((await request("/api/reviews/" + id, "DELETE", undefined, a.token)).status, 200);
-    visible = await request("/api/reviews?movieTitle=" + encodeURIComponent(title));
-    assert.equal(visible.data.length, 1);
-    assert.equal(visible.data[0].r_id, legacy.rows[0].r_id);
+    visible = await request("/api/reviews?movieId=" + movieId.toString());
+    assert.equal(visible.data.length, 0);
+    assert.equal((await pgQuery("SELECT r_id FROM reviews WHERE r_id = $1", [legacy.rows[0].r_id])).rowCount, 1);
   } finally {
+    await mongo.db(process.env.DB_NAME || "inf2003_db").collection("movies_metadata").deleteOne({_id: movieId});
+    await mongo.close();
     await pgQuery("DELETE FROM reviews WHERE movie_title = $1", [title]);
     await pgQuery("DELETE FROM users WHERE u_email = ANY($1::text[])", [emails]);
     await closePg();

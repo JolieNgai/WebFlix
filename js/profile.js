@@ -80,7 +80,7 @@ function renderWatchlistCard(movie) {
   body.append(title, metadata);
   if (!movie.unavailable) {
     const details = document.createElement("a");
-    details.href = "movie.html?t=" + encodeURIComponent(movie.title);
+    details.href = "movie.html?id=" + encodeURIComponent(movie.movie_id);
     details.className = "btn btn-outline-secondary mb-2";
     details.textContent = "View movie";
     body.append(details);

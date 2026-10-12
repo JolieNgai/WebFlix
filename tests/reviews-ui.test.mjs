@@ -21,6 +21,7 @@ function setup() {
     document:{addEventListener(){},createElement(){return new Element()},getElementById:get},
     localStorage:{getItem(){return "token"}},
     fetch:async()=>({ok:true,json:async()=>({id:1,name:"Owner"})}),
+    resolveMovieReference: async () => ({ _id: "507f1f77bcf86cd799439011", title: "Movie" }),
     URLSearchParams,console,Date
   };
   vm.createContext(context);
@@ -76,5 +77,7 @@ test("guest cannot submit and authenticated submissions carry the bearer token",
   await owner.get("reviewForm").listeners.submit({preventDefault(){}});
   assert.equal(request.options.headers.Authorization,"Bearer token");
   assert.equal(request.options.method,"POST");
+  assert.equal(JSON.parse(request.options.body).movieId,"507f1f77bcf86cd799439011");
+  assert.equal(JSON.parse(request.options.body).movieTitle,undefined);
   assert.equal(owner.get("review-status").textContent,"Your session expired. Log in again.");
 });

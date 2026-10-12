@@ -13,11 +13,6 @@ function currentReviewUser() {
   return reviewUserPromise;
 }
 
-function reviewMovieTitle() {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("t") || params.get("title") || "";
-}
-
 function reviewStatus(message, error = false) {
   const target = document.getElementById("review-status");
   target.textContent = message;
@@ -108,11 +103,11 @@ function renderReview(review, user) {
 
 async function loadReviews() {
   const list = document.getElementById("reviews-list");
-  const title = reviewMovieTitle();
-  if (!list || !title) return;
+  if (!list) return;
   try {
+    const movie = await resolveMovieReference();
     const [response, user] = await Promise.all([
-      fetch(`${REVIEW_API_BASE}/api/reviews?movieTitle=${encodeURIComponent(title)}`),
+      fetch(`${REVIEW_API_BASE}/api/reviews?movieId=${encodeURIComponent(movie._id)}`),
       currentReviewUser()
     ]);
     if (!response.ok) throw new Error("Reviews are unavailable. Try again.");
@@ -142,12 +137,13 @@ async function hookReviewForm() {
   if (!form) return;
   form.hidden = true;
   const user = await currentReviewUser();
-  const title = reviewMovieTitle();
   document.getElementById("review-login-prompt").hidden = !!user;
   if (!user) return;
-  if (!title) { reviewStatus("Choose a movie before writing a review.", true); return; }
+  let movie;
+  try { movie = await resolveMovieReference(); }
+  catch (error) { reviewStatus(error.message, true); return; }
   form.hidden = false;
-  document.getElementById("movieIdInput").value = title;
+  document.getElementById("movieIdInput").value = movie._id;
   document.getElementById("review-cancel").addEventListener("click", () => { if (!reviewSubmitting) { resetReviewEditor(); reviewStatus(""); } });
   form.addEventListener("submit", async event => {
     event.preventDefault();
@@ -166,7 +162,7 @@ async function hookReviewForm() {
     submit.textContent = "Saving...";
     const editing = editingReviewId !== null;
     try {
-      await reviewRequest(editing ? "/api/reviews/" + editingReviewId : "/api/reviews", editing ? "PATCH" : "POST", { movieTitle: title, rating, comment });
+      await reviewRequest(editing ? "/api/reviews/" + editingReviewId : "/api/reviews", editing ? "PATCH" : "POST", { movieId: movie._id, rating, comment });
       resetReviewEditor();
       reviewStatus(editing ? "Review updated." : "Review published.");
       await loadReviews();

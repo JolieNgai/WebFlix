@@ -231,9 +231,10 @@ Paths are relative to the API base URL.
 | --- | --- | --- |
 | GET | `/health` | Check database connectivity. |
 | GET | `/api/movies` | List movies; accepts `page`, `limit`, `q`, and `minRating`. |
-| GET | `/api/movies/by-title/:title` | Get a movie by its URL-encoded title. |
-| GET | `/api/reviews` | List reviews; optionally filter by `movieTitle`. |
-| POST | `/api/reviews` | Authenticated: submit `movieTitle`, `rating`, and `comment`. |
+| GET | `/api/movies/:id` | Get a movie by its stable MongoDB ObjectId. |
+| GET | `/api/movies/by-title/:title` | Resolve an old title link; duplicate titles return 409. |
+| GET | `/api/reviews` | List reviews; optionally filter by `movieId`. |
+| POST | `/api/reviews` | Authenticated: submit `movieId`, `rating`, and `comment`. |
 | PATCH | `/api/reviews/:id` | Owner only: update `rating` and `comment`. |
 | DELETE | `/api/reviews/:id` | Owner only: delete a review. |
 | POST | `/api/register` | Register with `name`, `email`, and `password`. |
@@ -346,3 +347,50 @@ docker compose exec -T backend node --test backend/tests/reviews.test.js backend
 Integration tests create and remove their own temporary data, and check unauthenticated
 requests, cross-account edits/deletions, spoofed owner IDs, foreign keys, validation,
 and repeatable schema initialization.
+
+## Stable movie references
+
+MongoDB `_id` is the canonical movie identifier. Its 24-character ObjectId string
+is stored in PostgreSQL `reviews.movie_id` and `watchlist.movie_id`. Movie links use
+`movie.html?id=<movie-id>`, and the movie API returns `_id` in list/detail responses.
+Duplicate titles are separate movies. Renaming a movie keeps its existing ID,
+reviews, and watchlist entries intact.
+
+New review requests must provide `movieId`. The server validates that the movie
+exists in MongoDB and derives its title itself. `movie_title` remains a historical
+label; review matching uses `movie_id`. Review reads show the current movie title
+when the movie is available. The index on `(movie_id, created_at DESC)` supports
+per-movie review queries. MongoDB references cannot have a PostgreSQL foreign key,
+so the API validates them and preserves references if a movie is later removed.
+
+Existing title-based bookmarks resolve to an ID only when the title is unambiguous.
+If several movies have the same title, select the intended movie from the catalog.
+
+Docker runs the review ID migration after initializing the schema and seeding movies.
+The migration updates only reviews with no ID and an exact title matching one movie.
+It never changes an existing ID, deletes a review, or chooses among duplicate titles.
+Unmatched or ambiguous reviews keep a null `movie_id` and require manual reconciliation;
+they remain accessible through the unfiltered review endpoint. Preserve MongoDB `_id`
+values when importing or restoring movie data.
+
+For non-Docker databases, initialize the schema, then run:
+
+```sh
+node --env-file=.env backend/scripts/migrate_review_movie_ids.js
+```
+
+To inspect unresolved references in PostgreSQL:
+
+```sql
+SELECT r_id, movie_title, user_id
+FROM reviews
+WHERE movie_id IS NULL
+ORDER BY r_id;
+```
+
+Verify ID links, title collisions, renames, migrations, and permissions:
+
+```sh
+node --test tests/movie-reference.test.mjs tests/reviews-ui.test.mjs tests/watchlist-ui.test.mjs
+docker compose exec -T backend node --test backend/tests/movie-ids.test.js backend/tests/reviews.test.js backend/tests/watchlist.test.js
+```

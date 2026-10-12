@@ -38,7 +38,7 @@ services:
   setup:
     build: .
     environment: *backend-environment
-    command: ["sh", "-c", "node backend/scripts/init_pgdb.js && node backend/scripts/seed_movies.js"]
+    command: ["sh", "-c", "node backend/scripts/init_pgdb.js && node backend/scripts/seed_movies.js && node backend/scripts/migrate_review_movie_ids.js"]
     depends_on:
       postgres:
         condition: service_healthy

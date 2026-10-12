@@ -3,7 +3,7 @@ dotenv.config();
 
 import express from "express";
 import cors from "cors";
-import { MongoClient, ServerApiVersion } from "mongodb";
+import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 
 import { pgHealth, closePg, pgQuery } from "./config/postgres.js";
 import { authRouter, verifyToken } from "./routes/authenticate.js";
@@ -16,7 +16,7 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
 app.use("/api", authRouter);
-app.use("/api/reviews", reviewRoutes(pgQuery, verifyToken)); 
+app.use("/api/reviews", reviewRoutes(pgQuery, verifyToken, () => Movies)); 
 
 const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
 if (!uri) throw new Error("Set MONGODB_URI or MONGO_URI before starting the API.");
@@ -132,6 +132,7 @@ function normalizeMovie(doc) {
     : null;
 
   return {
+    _id: doc._id.toString(),
     title: doc.title,
     original_title: doc.original_title || null,
     release_date,
@@ -290,54 +291,30 @@ app.get("/api/movies", async (req, res) => {
   }
 });
 
-// Detailed single movie by title (case-insensitive exact match)
+// Compatibility for existing title links: only resolve an unambiguous title.
 app.get("/api/movies/by-title/:title", async (req, res) => {
-  if (!Movies) {
-    return res.status(503).json({ error: "DB not connected yet" });
-  }
-
+  if (!Movies) return res.status(503).json({ error: "DB not connected yet" });
   try {
-    const title = req.params.title;
-    const projection = {
-      _id: 0,
-      title: 1,
-      original_title: 1,
-      release_date: 1,
-      tagline: 1,
-      overview: 1,
-      runtime: 1,
-      vote_average: 1,
-      vote_count: 1,
-      popularity: 1,
-      budget: 1,
-      revenue: 1,
-      status: 1,
-      homepage: 1,
-      imdb_id: 1,
-      adult: 1,
-      original_language: 1,
-      genres: 1,
-      spoken_languages: 1,
-      production_companies: 1,
-      production_countries: 1,
-      poster_path: 1,
-      belongs_to_collection: 1,
-    };
+    const documents = await Movies.find({ title: { $regex: `^${escapeRegExp(req.params.title)}$`, $options: "i" } }).limit(2).toArray();
+    if (!documents.length) return res.status(404).json({ error: "Movie not found" });
+    if (documents.length > 1) return res.status(409).json({ error: "Multiple movies share this title. Choose a movie from the catalog." });
+    res.json(normalizeMovie(documents[0]));
+  } catch (error) {
+    console.error("Movie title lookup failed:", error);
+    res.status(500).json({ error: "Could not load movie details" });
+  }
+});
 
-    const doc = await Movies.findOne(
-      { title: { $regex: `^${escapeRegExp(title)}$`, $options: "i" } },
-      { projection }
-    );
-
-    if (!doc) {
-      return res.status(404).json({ error: "Movie not found" });
-    }
-
-    const movie = normalizeMovie(doc);
-    res.json(movie);
-  } catch (err) {
-    console.error("❌ /api/movies/by-title error:", err);
-    res.status(500).json({ error: err.message });
+app.get("/api/movies/:id", async (req, res) => {
+  if (!/^[a-f0-9]{24}$/i.test(req.params.id)) return res.status(400).json({ error: "Invalid movie ID" });
+  if (!Movies) return res.status(503).json({ error: "DB not connected yet" });
+  try {
+    const movie = await Movies.findOne({ _id: new ObjectId(req.params.id) });
+    if (!movie) return res.status(404).json({ error: "Movie not found" });
+    res.json(normalizeMovie(movie));
+  } catch (error) {
+    console.error("Movie ID lookup failed:", error);
+    res.status(500).json({ error: "Could not load movie details" });
   }
 });
 

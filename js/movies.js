@@ -66,8 +66,8 @@ function renderCard(m) {
             ? `<p class="small text-muted mb-2">${esc(overviewShort)}</p>`
             : ""
         }
-        <a class="btn btn-primary mt-auto" href="movie.html?t=${encodeURIComponent(
-          m.title
+        <a class="btn btn-primary mt-auto" href="movie.html?id=${encodeURIComponent(
+          m._id
         )}">Details</a>
       </div>
     </div>
@@ -263,12 +263,12 @@ async function loadRelatedMovies(movie) {
     const response = await fetch(API_BASE + "/api/movies?limit=36&minRating=0");
     if (!response.ok) throw new Error("Could not load more movies");
     const data = await response.json();
-    const candidates = (data.documents || []).filter(m => m.title !== movie.title);
+    const candidates = (data.documents || []).filter(m => m._id !== movie._id);
     const genres = new Set(movie.genres || []);
     const matching = candidates.filter(m => (m.genres || []).some(g => genres.has(g)));
     const related = matching.length ? matching.slice(0,6) : candidates.slice(0,6);
     heading.textContent = matching.length ? "Related movies" : "More to discover";
-    target.innerHTML = related.map(m => `<a class="related-card" href="movie.html?t=${encodeURIComponent(m.title)}"><img src="${esc(safeImage(m.poster_url, PLACEHOLDER_CARD))}" alt="${esc(m.title)} poster" loading="lazy" onerror="this.src='assets/poster-placeholder.svg'"><span class="related-rating">${Number(m.vote_average) > 0 ? "&#9733; " + Number(m.vote_average).toFixed(1) + " / 10" : "Not rated"}</span><h3>${esc(m.title)}</h3><p>${esc(m.year || "")}</p></a>`).join("") || '<p>No other movies are available yet.</p>';
+    target.innerHTML = related.map(m => `<a class="related-card" href="movie.html?id=${encodeURIComponent(m._id)}"><img src="${esc(safeImage(m.poster_url, PLACEHOLDER_CARD))}" alt="${esc(m.title)} poster" loading="lazy" onerror="this.src='assets/poster-placeholder.svg'"><span class="related-rating">${Number(m.vote_average) > 0 ? "&#9733; " + Number(m.vote_average).toFixed(1) + " / 10" : "Not rated"}</span><h3>${esc(m.title)}</h3><p>${esc(m.year || "")}</p></a>`).join("") || '<p>No other movies are available yet.</p>';
   } catch {
     target.innerHTML = '<p>More movies are unavailable right now. <a href="index.html">Browse the collection</a></p>';
   }
@@ -278,29 +278,15 @@ async function loadDetails() {
   const target = document.getElementById("movieDetail");
   if (!target) return;
 
-  const params = new URLSearchParams(location.search);
-  const titleParam = params.get("t") || params.get("title");
-  if (!titleParam) {
-    target.innerHTML = `<p class="text-danger">Missing movie title.</p>`;
-    return;
-  }
-
-  target.innerHTML = `<p class="text-muted">Loading movie details…</p>`;
-
+  target.innerHTML = `<p class="text-muted">Loading movie details...</p>`;
   try {
-    const res = await fetch(
-      `${API_BASE}/api/movies/by-title/${encodeURIComponent(titleParam)}`
-    );
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
-    }
-    const movie = await res.json();
+    const movie = await resolveMovieReference();
     target.innerHTML = renderDetails(movie);
     document.title = movie.title + " | WebFlix";
     loadRelatedMovies(movie);
   } catch (e) {
     console.error(e);
-    target.innerHTML = `<p class="text-danger">Could not load details.</p>`;
+    target.innerHTML = `<p class="text-danger">${esc(e.message || "Could not load details.")}</p><a href="index.html#catalog">Back to collection</a>`;
   }
 }
 
